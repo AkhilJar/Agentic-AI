@@ -1,0 +1,303 @@
+2025-08-06 17:09:01,952 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://cvresume321.blob.core.windows.net/evaluationresults?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'f2fac7fa-72b9-11f0-b209-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 17:09:03,640 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 404
+Response headers:
+    'Content-Length': '223'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '0a09c6f5-401e-005d-5ac6-06e874000000'
+    'x-ms-client-request-id': 'f2fac7fa-72b9-11f0-b209-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ResourceNotFound'
+    'Date': 'Wed, 06 Aug 2025 11:39:03 GMT'
+2025-08-06 17:09:03,643 - main - WARNING - Container 'evaluationresults' issue: The specified resource does not exist.
+RequestId:0a09c6f5-401e-005d-5ac6-06e874000000
+Time:2025-08-06T11:39:03.7849350Z
+ErrorCode:ResourceNotFound
+Content: <?xml version="1.0" encoding="utf-8"?><Error><Code>ResourceNotFound</Code><Message>The specified resource does not exist.
+RequestId:0a09c6f5-401e-005d-5ac6-06e874000000
+Time:2025-08-06T11:39:03.7849350Z</Message></Error>
+2025-08-06 17:09:03,645 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://cvresume321.blob.core.windows.net/transcripts?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'f3fd0809-72b9-11f0-ac8b-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 17:09:03,900 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 404
+Response headers:
+    'Content-Length': '223'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '0a09c7ab-401e-005d-7dc6-06e874000000'
+    'x-ms-client-request-id': 'f3fd0809-72b9-11f0-ac8b-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ResourceNotFound'
+    'Date': 'Wed, 06 Aug 2025 11:39:03 GMT'
+2025-08-06 17:09:03,902 - main - WARNING - Container 'transcripts' issue: The specified resource does not exist.
+RequestId:0a09c7ab-401e-005d-7dc6-06e874000000
+Time:2025-08-06T11:39:04.0476970Z
+ErrorCode:ResourceNotFound
+Content: <?xml version="1.0" encoding="utf-8"?><Error><Code>ResourceNotFound</Code><Message>The specified resource does not exist.
+RequestId:0a09c7ab-401e-005d-7dc6-06e874000000
+Time:2025-08-06T11:39:04.0476970Z</Message></Error>
+2025-08-06 17:09:03,903 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://cvresume321.blob.core.windows.net/reports?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'f42495ad-72b9-11f0-ac99-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 17:09:04,171 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 404
+Response headers:
+    'Content-Length': '223'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '0a09c874-401e-005d-1cc6-06e874000000'
+    'x-ms-client-request-id': 'f42495ad-72b9-11f0-ac99-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ResourceNotFound'
+    'Date': 'Wed, 06 Aug 2025 11:39:03 GMT'
+2025-08-06 17:09:04,172 - main - WARNING - Container 'reports' issue: The specified resource does not exist.
+RequestId:0a09c874-401e-005d-1cc6-06e874000000
+Time:2025-08-06T11:39:04.3075554Z
+ErrorCode:ResourceNotFound
+Content: <?xml version="1.0" encoding="utf-8"?><Error><Code>ResourceNotFound</Code><Message>The specified resource does not exist.
+RequestId:0a09c874-401e-005d-1cc6-06e874000000
+Time:2025-08-06T11:39:04.3075554Z</Message></Error>
+2025-08-06 17:10:34,443 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://cvresume321.blob.core.windows.net/evaluationresults?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '2a1baa06-72ba-11f0-ba0d-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 17:10:35,571 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 404
+Response headers:
+    'Content-Length': '223'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'f684d7c4-501e-0023-78c6-067833000000'
+    'x-ms-client-request-id': '2a1baa06-72ba-11f0-ba0d-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ResourceNotFound'
+    'Date': 'Wed, 06 Aug 2025 11:40:35 GMT'
+2025-08-06 17:10:35,572 - __main__ - WARNING - Container 'evaluationresults' issue: The specified resource does not exist.
+RequestId:f684d7c4-501e-0023-78c6-067833000000
+Time:2025-08-06T11:40:35.7079779Z
+ErrorCode:ResourceNotFound
+Content: <?xml version="1.0" encoding="utf-8"?><Error><Code>ResourceNotFound</Code><Message>The specified resource does not exist.
+RequestId:f684d7c4-501e-0023-78c6-067833000000
+Time:2025-08-06T11:40:35.7079779Z</Message></Error>
+2025-08-06 17:10:35,574 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://cvresume321.blob.core.windows.net/transcripts?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '2ac86b41-72ba-11f0-a264-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 17:10:35,825 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 404
+Response headers:
+    'Content-Length': '223'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'f684d88b-501e-0023-2ec6-067833000000'
+    'x-ms-client-request-id': '2ac86b41-72ba-11f0-a264-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ResourceNotFound'
+    'Date': 'Wed, 06 Aug 2025 11:40:35 GMT'
+2025-08-06 17:10:35,826 - __main__ - WARNING - Container 'transcripts' issue: The specified resource does not exist.
+RequestId:f684d88b-501e-0023-2ec6-067833000000
+Time:2025-08-06T11:40:35.9657489Z
+ErrorCode:ResourceNotFound
+Content: <?xml version="1.0" encoding="utf-8"?><Error><Code>ResourceNotFound</Code><Message>The specified resource does not exist.
+RequestId:f684d88b-501e-0023-2ec6-067833000000
+Time:2025-08-06T11:40:35.9657489Z</Message></Error>
+2025-08-06 17:10:35,828 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://cvresume321.blob.core.windows.net/reports?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '2aef2cc7-72ba-11f0-94d5-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 17:10:36,084 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 404
+Response headers:
+    'Content-Length': '223'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'f684d961-501e-0023-79c6-067833000000'
+    'x-ms-client-request-id': '2aef2cc7-72ba-11f0-94d5-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ResourceNotFound'
+    'Date': 'Wed, 06 Aug 2025 11:40:36 GMT'
+2025-08-06 17:10:36,085 - __main__ - WARNING - Container 'reports' issue: The specified resource does not exist.
+RequestId:f684d961-501e-0023-79c6-067833000000
+Time:2025-08-06T11:40:36.2257745Z
+ErrorCode:ResourceNotFound
+Content: <?xml version="1.0" encoding="utf-8"?><Error><Code>ResourceNotFound</Code><Message>The specified resource does not exist.
+RequestId:f684d961-501e-0023-79c6-067833000000
+Time:2025-08-06T11:40:36.2257745Z</Message></Error>
+2025-08-06 17:22:04,000 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://cvresume321.blob.core.windows.net/evaluationresults?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'c51daf9d-72bb-11f0-a8fe-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 17:22:05,186 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 404
+Response headers:
+    'Content-Length': '223'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '6048b797-501e-001c-6ac8-06b090000000'
+    'x-ms-client-request-id': 'c51daf9d-72bb-11f0-a8fe-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ResourceNotFound'
+    'Date': 'Wed, 06 Aug 2025 11:52:04 GMT'
+2025-08-06 17:22:05,187 - main - WARNING - Container 'evaluationresults' issue: The specified resource does not exist.
+RequestId:6048b797-501e-001c-6ac8-06b090000000
+Time:2025-08-06T11:52:05.3086529Z
+ErrorCode:ResourceNotFound
+Content: <?xml version="1.0" encoding="utf-8"?><Error><Code>ResourceNotFound</Code><Message>The specified resource does not exist.
+RequestId:6048b797-501e-001c-6ac8-06b090000000
+Time:2025-08-06T11:52:05.3086529Z</Message></Error>
+2025-08-06 17:22:05,188 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://cvresume321.blob.core.windows.net/transcripts?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'c5d32e8f-72bb-11f0-b219-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 17:22:05,452 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 404
+Response headers:
+    'Content-Length': '223'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '6048b82d-501e-001c-6ec8-06b090000000'
+    'x-ms-client-request-id': 'c5d32e8f-72bb-11f0-b219-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ResourceNotFound'
+    'Date': 'Wed, 06 Aug 2025 11:52:05 GMT'
+2025-08-06 17:22:05,452 - main - WARNING - Container 'transcripts' issue: The specified resource does not exist.
+RequestId:6048b82d-501e-001c-6ec8-06b090000000
+Time:2025-08-06T11:52:05.5866189Z
+ErrorCode:ResourceNotFound
+Content: <?xml version="1.0" encoding="utf-8"?><Error><Code>ResourceNotFound</Code><Message>The specified resource does not exist.
+RequestId:6048b82d-501e-001c-6ec8-06b090000000
+Time:2025-08-06T11:52:05.5866189Z</Message></Error>
+2025-08-06 17:22:05,454 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://cvresume321.blob.core.windows.net/reports?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'c5fba6ff-72bb-11f0-a3da-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 17:22:05,710 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 404
+Response headers:
+    'Content-Length': '223'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '6048b8d6-501e-001c-03c8-06b090000000'
+    'x-ms-client-request-id': 'c5fba6ff-72bb-11f0-a3da-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ResourceNotFound'
+    'Date': 'Wed, 06 Aug 2025 11:52:05 GMT'
+2025-08-06 17:22:05,711 - main - WARNING - Container 'reports' issue: The specified resource does not exist.
+RequestId:6048b8d6-501e-001c-03c8-06b090000000
+Time:2025-08-06T11:52:05.8467096Z
+ErrorCode:ResourceNotFound
+Content: <?xml version="1.0" encoding="utf-8"?><Error><Code>ResourceNotFound</Code><Message>The specified resource does not exist.
+RequestId:6048b8d6-501e-001c-03c8-06b090000000
+Time:2025-08-06T11:52:05.8467096Z</Message></Error>
+2025-08-06 18:04:25,503 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://botstotage123.blob.core.windows.net/evaluationresults?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'aff848c9-72c1-11f0-9e79-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 18:04:27,188 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 409
+Response headers:
+    'Content-Length': '230'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41c6bfef-801e-0057-1cce-063f91000000'
+    'x-ms-client-request-id': 'aff848c9-72c1-11f0-9e79-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ContainerAlreadyExists'
+    'Date': 'Wed, 06 Aug 2025 12:34:26 GMT'
+2025-08-06 18:04:27,189 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://botstotage123.blob.core.windows.net/transcripts?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'b0f9b921-72c1-11f0-b75a-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 18:04:27,495 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 409
+Response headers:
+    'Content-Length': '230'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41c6c1c6-801e-0057-48ce-063f91000000'
+    'x-ms-client-request-id': 'b0f9b921-72c1-11f0-b75a-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ContainerAlreadyExists'
+    'Date': 'Wed, 06 Aug 2025 12:34:27 GMT'
+2025-08-06 18:04:27,497 - azure.core.pipeline.policies.http_logging_policy - INFO - Request URL: 'https://botstotage123.blob.core.windows.net/reports?restype=REDACTED'
+Request method: 'PUT'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.19.1 Python/3.12.4 (Windows-11-10.0.26100-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'b128b660-72c1-11f0-8410-c894026b8ae6'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2025-08-06 18:04:27,803 - azure.core.pipeline.policies.http_logging_policy - INFO - Response status: 409
+Response headers:
+    'Content-Length': '230'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41c6c358-801e-0057-37ce-063f91000000'
+    'x-ms-client-request-id': 'b128b660-72c1-11f0-8410-c894026b8ae6'
+    'x-ms-version': 'REDACTED'
+    'x-ms-error-code': 'ContainerAlreadyExists'
+    'Date': 'Wed, 06 Aug 2025 12:34:27 GMT'

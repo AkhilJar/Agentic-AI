@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HEVHIRE AI Interviewer - Enterprise Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+            --surface: rgba(255, 255, 255, 0.95);
+            --surface-dark: rgba(0, 0, 0, 0.02);
+            --text-primary: #111827;
+            --text-secondary: #6B7280;
+            --border: rgba(0, 0, 0, 0.1);
+            --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        .container {
+            background: var(--surface);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: var(--shadow-lg);
+            max-width: 900px;
+            width: 95%;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--primary);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            background: var(--primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
+
+        .title {
+            font-size: clamp(1.75rem, 4vw, 2.25rem);
+            font-weight: 700;
+            background: var(--primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.125rem;
+            font-weight: 400;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .enterprise-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #8B4513;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-top: 16px;
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+        }
+
+        .interview-area {
+            margin: 40px 0;
+        }
+
+        .status-card {
+            background: var(--surface-dark);
+            border-radius: 16px;
+            padding: 24px;
+            margin: 24px 0;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+        }
+
+        .status-text {
+            font-size: 1.125rem;
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .progress-container {
+            background: #E5E7EB;
+            height: 8px;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            background: var(--primary);
+            height: 100%;
+            border-radius: 12px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 0%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background-image: linear-gradient(-45deg, rgba(255, 255, 255, 0.2) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.2) 75%, transparent 75%, transparent);
+            background-size: 50px 50px;
+            animation: move 2s linear infinite;
+        }
+
+        @keyframes move {
+            0% { background-position: 0 0; }
+            100% { background-position: 50px 50px; }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-value {
+            font-size: 1.875rem;
+            font-weight: 700;
+            background: var(--primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .transcript-container {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin: 24px 0;
+            min-height: 320px;
+            max-height: 480px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            margin: 20px 0;
+            padding: 16px 20px;
+            border-radius: 16px;
+            max-width: 85%;
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            line-height: 1.6;
+        }
+
+        .message.bot {
+            background: linear-gradient(135deg, #10B981, #059669);
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .message.user {
+            background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+            color: white;
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .message .sender {
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-bottom: 8px;
+            opacity: 0.9;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .message .content {
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .message .timestamp {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 8px;
+            text-align: right;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .controls {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 32px 0;
+        }
+
+        .btn {
+            position: relative;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 160px;
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-record {
+            background: linear-gradient(135deg, #EF4444, #DC2626);
+            color: white;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-pause {
+            background: linear-gradient(135deg, #F59E0B, #D97706);
+            color: white;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #6B7280, #4B5563);
+            color: white;
+            box-shadow: 0 4px 15px rgba(107, 114, 128, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn:disabled::before {
+            display: none;
+        }
+
+        .recording-indicator {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin: 24px 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #FEF2F2, #FEE2E2);
+            border-radius: 12px;
+            border: 2px solid #FECACA;
+            color: #991B1B;
+            font-weight: 500;
+        }
+
+        .recording-indicator.active {
+            display: flex;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .recording-pulse {
+            width: 12px;
+            height: 12px;
+            background: #EF4444;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        .audio-visualizer {
+            display: none;
+            height: 60px;
+            background: linear-gradient(135deg, #1F2937, #111827);
+            border-radius: 12px;
+            margin: 20px 0;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .audio-visualizer.active {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .wave {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+            background: linear-gradient(45deg, #10B981, #3B82F6, #8B5CF6);
+            opacity: 0.8;
+            animation: wave 2s ease-in-out infinite;
+        }
+
+        @keyframes wave {
+            0%, 100% { transform: scaleY(0.3) scaleX(1); }
+            25% { transform: scaleY(0.8) scaleX(0.9); }
+            50% { transform: scaleY(1) scaleX(1); }
+            75% { transform: scaleY(0.6) scaleX(1.1); }
+        }
+
+        .completion-card {
+            text-align: center;
+            padding: 40px;
+            background: linear-gradient(135deg, #10B981, #059669);
+            color: white;
+            border-radius: 16px;
+            margin: 24px 0;
+            display: none;
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        .completion-card.show {
+            display: block;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .completion-card h2 {
+            font-size: 1.875rem;
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+
+        .completion-card p {
+            font-size: 1.125rem;
+            line-height: 1.6;
+            margin: 12px 0;
+            opacity: 0.95;
+        }
+
+        .error-card {
+            background: linear-gradient(135deg, #FEF2F2, #FEE2E2);
+            color: #991B1B;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 16px 0;
+            border-left: 4px solid #EF4444;
+            display: none;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1);
+        }
+
+        .error-card.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .loading-card {
+            display: none;
+            text-align: center;
+            margin: 24px 0;
+            padding: 24px;
+            background: white;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .loading-card.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .spinner {
+            border: 3px solid #F3F4F6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .feature-highlights {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 32px 0;
+            padding: 24px;
+            background: var(--surface-dark);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .feature-item {
+            text-align: center;
+            padding: 16px;
+        }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            background: var(--primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .feature-text {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 24px;
+                margin: 16px;
+                border-radius: 16px;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .btn {
+                min-width: 200px;
+            }
+
+            .title {
+                font-size: 1.75rem;
+            }
+
+            .subtitle {
+                font-size: 1rem;
+            }
+
+            .message {
+                max-width: 90%;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 12px;
+            }
+        }
+
+        /* Accessibility improvements */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            .container {
+                border: 2px solid;
+            }
+            
+            .btn {
+                border: 2px solid;
+            }
+        }
+
+        /* Confetti animation for completion */
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🤖</div>
+            <h1 class="title">HEVHIRE AI Interviewer</h1>
+            <p class="subtitle">Revolutionary AI-Powered Technical Interview Platform</p>
+            <div class="enterprise-badge">
+                <span>✨</span>
+                <span>Enterprise Edition</span>
+            </div>
+        </div>
+
+        <div class="feature-highlights">
+            <div class="feature-item">
+                <div class="feature-icon">🧠</div>
+                <div class="feature-text">GPT-4 Powered Intelligence</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">🎤</div>
+                <div class="feature-text">Premium Speech Recognition</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">📊</div>
+                <div class="feature-text">Advanced Analytics</div>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">📧</div>
+                <div class="feature-text">Automated Reporting</div>
+            </div>
+        </div>
+
+        <div class="interview-area">
+            <div class="status-card">
+                <div id="statusText" class="status-text">Ready to start your AI-powered interview</div>
+                <div class="progress-container">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="stats-grid" id="statsContainer" style="display: none;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="questionCount">0</div>
+                        <div class="stat-label">Questions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="interviewTime">00:00</div>
+                        <div class="stat-label">Duration</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="confidenceScore">--</div>
+                        <div class="stat-label">AI Confidence</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="engagementLevel">--</div>
+                        <div class="stat-label">Engagement</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="transcript-container" id="transcriptContainer">
+                <div class="message bot">
+                    <div class="sender">🤖 AI Interviewer</div>
+                    <div class="content">Welcome to the most advanced AI interviewing platform! Click "Start Interview" to begin your personalized technical assessment powered by GPT-4.</div>
+                    <div class="timestamp" id="welcomeTime"></div>
+                </div>
+            </div>
+
+            <div class="recording-indicator" id="recordingIndicator">
+                <div class="recording-pulse"></div>
+                <span>🎤 Recording in progress... Speak clearly and confidently</span>
+            </div>
+
+            <div class="audio-visualizer" id="audioVisualizer">
+                <div class="wave"></div>
+            </div>
+
+            <div class="loading-card" id="loadingIndicator">
+                <div class="spinner"></div>
+                <div>AI is processing your response...</div>
+                <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 8px;">
+                    Using advanced speech recognition and GPT-4 analysis
+                </div>
+            </div>
+
+            <div class="error-card" id="errorMessage">
+                <strong>Error:</strong> <span id="errorText"></span>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-primary" id="startBtn" onclick="startInterview()">
+                    🚀 Start AI Interview
+                </button>
+                <button class="btn btn-record" id="recordBtn" onclick="startRecording()" disabled>
+                    🎤 Record Response
+                </button>
+                <button class="btn btn-pause" id="pauseBtn" onclick="pauseRecording()" disabled>
+                    ⏸️ Pause
+                </button>
+                <button class="btn btn-stop" id="stopBtn" onclick="stopRecording()" disabled>
+                    ⏹️ Submit Response
+                </button>
+            </div>
+
+            <div class="completion-card" id="interviewComplete">
+                <h2>🎉 Interview Complete!</h2>
+                <p>Congratulations! You've successfully completed the AI-powered technical interview.</p>
+                <p>Your responses have been analyzed using advanced AI algorithms and comprehensive scoring metrics.</p>
+                <p><strong>A detailed evaluation report with PDF summary has been automatically sent to our recruitment team.</strong></p>
+                <p>You'll receive personalized feedback and next steps via email within 24 hours.</p>
+                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.2);">
+                    <small>Session ID: <span id="sessionIdDisplay"></span></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // 🚀 ENTERPRISE FRONTEND JAVASCRIPT
+        // ============================================================================
+
+        // Global state management
+        const AppState = {
+            sessionId: null,
+            mediaRecorder: null,
+            audioChunks: [],
+            isRecording: false,
+            isPaused: false,
+            startTime: null,
+            timerInterval: null,
+            questionCount: 0,
+            maxQuestions: 7,
+            currentStage: 'introduction',
+            confidenceScore: 0,
+            engagementLevel: 0
+        };
+
+        // Enterprise API configuration
+        const API_CONFIG = {
+            baseUrl: window.location.origin,
+            timeout: 30000,
+            retryAttempts: 3
+        };
+
+        // ============================================================================
+        // 🎯 INITIALIZATION
+        // ============================================================================
+
+        window.onload = function() {
+            initializeApp();
+        };
+
+        async function initializeApp() {
+            try {
+                // Set welcome timestamp
+                document.getElementById('welcomeTime').textContent = new Date().toLocaleTimeString();
+                
+                // Check microphone permissions
+                await checkMicrophonePermission();
+                
+                // Add keyboard shortcuts
+                setupKeyboardShortcuts();
+                
+                // Add accessibility features
+                setupAccessibility();
+                
+                console.log('🚀 HEVHIRE AI Interviewer initialized successfully');
+            } catch (error) {
+                console.error('❌ Initialization failed:', error);
+                showError('Failed to initialize the interview platform. Please refresh and try again.');
+            }
+        }
+
+        async function checkMicrophonePermission() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop());
+                console.log('✅ Microphone permission granted');
+            } catch (error) {
+                showError('Microphone access is required for the AI interview. Please allow microphone permissions and refresh the page.');
+                throw error;
+            }
+        }
+
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (event) => {
+                if (event.ctrlKey || event.metaKey) {
+                    switch(event.code) {
+                        case 'Space':
+                            event.preventDefault();
+                            if (!AppState.isRecording && !document.getElementById('recordBtn').disabled) {
+                                startRecording();
+                            } else if (AppState.isRecording) {
+                                stopRecording();
+                            }
+                            break;
+                        case 'KeyP':
+                            event.preventDefault();
+                            if (AppState.isRecording) {
+                                pauseRecording();
+                            }
+                            break;
+                    }
+                }
+            });
+        }
+
+        function setupAccessibility() {
+            // Add ARIA labels
+            document.getElementById('transcriptContainer').setAttribute('aria-live', 'polite');
+            document.getElementById('statusText').setAttribute('aria-live', 'polite');
+            
+            // Add focus management
+            const buttons = document.querySelectorAll('.btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('focus', () => {
+                    btn.style.outline = '2px solid #667eea';
+                    btn.style.outlineOffset = '2px';
+                });
+                btn.addEventListener('blur', () => {
+                    btn.style.outline = 'none';
+                });
+            });
+        }
+
+        // ============================================================================
+        // 🎤 INTERVIEW FLOW MANAGEMENT
+        // ============================================================================
+
+        async function startInterview() {
+            try {
+                showLoading(true, 'Initializing AI interview session...');
+                
+                const response = await makeAPICall('/interview/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                AppState.sessionId = data.session_id;
+                
+                // Add AI message to transcript
+                addMessage('bot', data.ai_response);
+                
+                // Play AI audio if available
+                if (data.audio_data) {
+                    await playAudio(data.audio_data);
+                }
+
+                // Update UI state
+                updateInterviewState({
+                    started: true,
+                    status: 'Interview started! Please introduce yourself.',
+                    showStats: true
+                });
+
+                startTimer();
+                showLoading(false);
+
+                console.log('✅ Interview started:', AppState.sessionId);
+
+            } catch (error) {
+                console.error('❌ Failed to start interview:', error);
+                showError('Failed to start the AI interview. Please check your connection and try again.');
+                showLoading(false);
+            }
+        }
+
+        async function startRecording() {
+            if (!AppState.sessionId) {
+                showError('Please start the interview first');
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 44100
+                    } 
+                });
+
+                // Enhanced MediaRecorder setup
+                const options = { mimeType: 'audio/webm;codecs=opus' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options.mimeType = 'audio/webm';
+                }
+
+                AppState.mediaRecorder = new MediaRecorder(stream, options);
+                AppState.audioChunks = [];
+                
+                AppState.mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        AppState.audioChunks.push(event.data);
+                    }
+                };
+
+                AppState.mediaRecorder.onstop = () => {
+                    processAudioRecording();
+                };
+
+                AppState.mediaRecorder.onerror = (event) => {
+                    console.error('MediaRecorder error:', event.error);
+                    showError('Recording error occurred. Please try again.');
+                };
+
+                AppState.mediaRecorder.start(100); // Collect data every 100ms
+                AppState.isRecording = true;
+                AppState.isPaused = false;
+
+                // Update UI for recording state
+                updateRecordingState(true);
+
+            } catch (error) {
+                console.error('❌ Failed to start recording:', error);
+                showError('Failed to access microphone. Please check permissions and try again.');
+            }
+        }
+
+        function pauseRecording() {
+            if (AppState.mediaRecorder && AppState.isRecording) {
+                if (!AppState.isPaused) {
+                    AppState.mediaRecorder.pause();
+                    AppState.isPaused = true;
+                    updatePauseButton(true);
+                    updateStatus('Recording paused - click Resume to continue');
+                } else {
+                    AppState.mediaRecorder.resume();
+                    AppState.isPaused = false;
+                    updatePauseButton(false);
+                    updateStatus('Recording resumed - speak your answer clearly');
+                }
+            }
+        }
+
+        function stopRecording() {
+            if (AppState.mediaRecorder && AppState.isRecording) {
+                AppState.mediaRecorder.stop();
+                AppState.isRecording = false;
+                AppState.isPaused = false;
+
+                // Stop all tracks
+                AppState.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+
+                // Update UI
+                updateRecordingState(false);
+                updateStatus('Processing your response with AI...');
+            }
+        }
+
+        async function processAudioRecording() {
+            try {
+                showLoading(true, 'AI is analyzing your response...');
+                
+                const audioBlob = new Blob(AppState.audioChunks, { type: 'audio/webm' });
+                
+                // Validate audio size
+                if (audioBlob.size < 1000) {
+                    throw new Error('Recording too short. Please speak for at least 2 seconds.');
+                }
+                
+                if (audioBlob.size > 25 * 1024 * 1024) {
+                    throw new Error('Recording too large. Please keep responses under 5 minutes.');
+                }
+
+                const formData = new FormData();
+                formData.append('file', audioBlob, 'recording.webm');
+
+                const response = await makeAPICall(`/interview/${AppState.sessionId}/process`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Add user message (transcription)
+                addMessage('user', data.transcript);
+                
+                // Add AI response
+                addMessage('bot', data.ai_response);
+                
+                // Play AI audio if available
+                if (data.audio_data) {
+                    await playAudio(data.audio_data);
+                }
+
+                // Update progress and metrics
+                updateProgress(data);
+                updateMetrics(data);
+
+                // Check if interview is complete
+                if (data.is_complete) {
+                    completeInterview(data);
+                } else {
+                    updateStatus(`Question ${data.question_count}/${AppState.maxQuestions} - Ready for your next response`);
+                    enableRecording();
+                }
+
+                showLoading(false);
+
+            } catch (error) {
+                console.error('❌ Failed to process audio:', error);
+                showError(error.message || 'Failed to process your response. Please try again.');
+                showLoading(false);
+                enableRecording();
+            }
+        }
+
+        // ============================================================================
+        // 🎨 UI UPDATE FUNCTIONS
+        // ============================================================================
+
+        function updateInterviewState(state) {
+            if (state.started) {
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('recordBtn').disabled = false;
+            }
+            
+            if (state.status) {
+                updateStatus(state.status);
+            }
+            
+            if (state.showStats) {
+                document.getElementById('statsContainer').style.display = 'grid';
+            }
+        }
+
+        function updateRecordingState(isRecording) {
+            const indicator = document.getElementById('recordingIndicator');
+            const visualizer = document.getElementById('audioVisualizer');
+            
+            if (isRecording) {
+                indicator.classList.add('active');
+                visualizer.classList.add('active');
+                document.getElementById('recordBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = false;
+                updateStatus('🎤 Recording in progress - speak clearly and confidently');
+            } else {
+                indicator.classList.remove('active');
+                visualizer.classList.remove('active');
+                document.getElementById('pauseBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = true;
+                resetPauseButton();
+            }
+        }
+
+        function updatePauseButton(isPaused) {
+            const pauseBtn = document.getElementById('pauseBtn');
+            if (isPaused) {
+                pauseBtn.innerHTML = '▶️ Resume';
+                document.getElementById('recordingIndicator').classList.remove('active');
+            } else {
+                pauseBtn.innerHTML = '⏸️ Pause';
+                document.getElementById('recordingIndicator').classList.add('active');
+            }
+        }
+
+        function resetPauseButton() {
+            document.getElementById('pauseBtn').innerHTML = '⏸️ Pause';
+        }
+
+        function enableRecording() {
+            document.getElementById('recordBtn').disabled = false;
+        }
+
+        function updateStatus(message) {
+            document.getElementById('statusText').textContent = message;
+        }
+
+        function updateProgress(data) {
+            AppState.questionCount = data.question_count || AppState.questionCount;
+            const progress = (AppState.questionCount / AppState.maxQuestions) * 100;
+            document.getElementById('progressFill').style.width = `${progress}%`;
+            document.getElementById('questionCount').textContent = AppState.questionCount;
+        }
+
+        function updateMetrics(data) {
+            if (data.confidence_score !== undefined) {
+                AppState.confidenceScore = data.confidence_score;
+                document.getElementById('confidenceScore').textContent = `${Math.round(data.confidence_score * 100)}%`;
+            }
+            
+            if (data.engagement_level !== undefined) {
+                AppState.engagementLevel = data.engagement_level;
+                document.getElementById('engagementLevel').textContent = `${Math.round(data.engagement_level * 10)}/10`;
+            }
+        }
+
+        function addMessage(role, content) {
+            const container = document.getElementById('transcriptContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const sender = role === 'bot' ? '🤖 AI Interviewer' : '👤 You';
+            
+            messageDiv.innerHTML = `
+                <div class="sender">${sender}</div>
+                <div class="content">${content}</div>
+                <div class="timestamp">${timestamp}</div>
+            `;
+            
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+            
+            // Add entrance animation
+            messageDiv.style.opacity = '0';
+            messageDiv.style.transform = 'translateY(20px)';
+            
+            requestAnimationFrame(() => {
+                messageDiv.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+                messageDiv.style.opacity = '1';
+                messageDiv.style.transform = 'translateY(0)';
+            });
+        }
+
+        // ============================================================================
+        // 🔊 AUDIO PROCESSING
+        // ============================================================================
+
+        async function playAudio(hexData) {
+            try {
+                if (!hexData) return;
+                
+                // Convert hex to binary
+                const bytes = new Uint8Array(
+                    hexData.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
+                );
+                const audioBlob = new Blob([bytes], { type: 'audio/mpeg' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                const audio = new Audio(audioUrl);
+                audio.volume = 0.8;
+                
+                // Add audio event listeners
+                audio.onloadeddata = () => {
+                    console.log('🔊 AI audio loaded successfully');
+                };
+                
+                audio.onerror = (error) => {
+                    console.warn('🔊 Audio playback failed:', error);
+                };
+                
+                await audio.play();
+                
+                // Cleanup URL after playback
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                };
+                
+            } catch (error) {
+                console.warn('🔊 Audio playback error:', error);
+            }
+        }
+
+        // ============================================================================
+        // 🏁 INTERVIEW COMPLETION
+        // ============================================================================
+
+        function completeInterview(data) {
+            // Stop timer
+            stopTimer();
+            
+            // Disable all controls
+            document.getElementById('recordBtn').disabled = true;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = true;
+            
+            // Show completion card
+            document.getElementById('interviewComplete').classList.add('show');
+            document.getElementById('sessionIdDisplay').textContent = AppState.sessionId;
+            updateStatus('✅ Interview completed successfully! Comprehensive report sent to recruitment team.');
+            
+            // Update progress to 100%
+            document.getElementById('progressFill').style.width = '100%';
+            
+            // Add celebration message
+            addMessage('bot', '🎉 Thank you for completing the AI-powered interview! Your comprehensive evaluation has been processed and sent to our recruitment team with detailed PDF report and analytics. You should receive detailed feedback and next steps via email within 24 hours. We\'re excited about the possibility of you joining our team!');
+            
+            // Add confetti effect
+            createConfettiEffect();
+            
+            console.log('🎉 Interview completed successfully');
+        }
+
+        function createConfettiEffect() {
+            // Simple confetti effect
+            const colors = ['#667eea', '#764ba2', '#10B981', '#3B82F6', '#8B5CF6'];
+            const container = document.body;
+            
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.style.cssText = `
+                        position: fixed;
+                        top: -10px;
+                        left: ${Math.random() * 100}%;
+                        width: 10px;
+                        height: 10px;
+                        background: ${colors[Math.floor(Math.random() * colors.length)]};
+                        transform: rotate(${Math.random() * 360}deg);
+                        animation: fall 3s linear forwards;
+                        pointer-events: none;
+                        z-index: 10000;
+                    `;
+                    
+                    container.appendChild(confetti);
+                    
+                    setTimeout(() => confetti.remove(), 3000);
+                }, i * 100);
+            }
+        }
+
+        // ============================================================================
+        // ⏱️ TIMER MANAGEMENT
+        // ============================================================================
+
+        function startTimer() {
+            AppState.startTime = Date.now();
+            AppState.timerInterval = setInterval(() => {
+                const elapsed = Date.now() - AppState.startTime;
+                const minutes = Math.floor(elapsed / 60000);
+                const seconds = Math.floor((elapsed % 60000) / 1000);
+                document.getElementById('interviewTime').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (AppState.timerInterval) {
+                clearInterval(AppState.timerInterval);
+                AppState.timerInterval = null;
+            }
+        }
+
+        // ============================================================================
+        // 🔧 UTILITY FUNCTIONS
+        // ============================================================================
+
+        async function makeAPICall(endpoint, options = {}) {
+            const url = `${API_CONFIG.baseUrl}${endpoint}`;
+            const defaultOptions = {
+                timeout: API_CONFIG.timeout,
+                ...options
+            };
+
+            for (let attempt = 1; attempt <= API_CONFIG.retryAttempts; attempt++) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), defaultOptions.timeout);
+                    
+                    const response = await fetch(url, {
+                        ...defaultOptions,
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    return response;
+                    
+                } catch (error) {
+                    console.warn(`API call attempt ${attempt} failed:`, error);
+                    
+                    if (attempt === API_CONFIG.retryAttempts) {
+                        throw error;
+                    }
+                    
+                    // Wait before retry
+                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                }
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('errorText').textContent = message;
+            document.getElementById('errorMessage').classList.add('show');
+            
+            // Auto-hide after 8 seconds
+            setTimeout(() => {
+                document.getElementById('errorMessage').classList.remove('show');
+            }, 8000);
+            
+            console.error('🚨 Error:', message);
+        }
+
+        function showLoading(show, message = 'Processing...') {
+            const loadingCard = document.getElementById('loadingIndicator');
+            if (show) {
+                loadingCard.querySelector('div:last-child').textContent = message;
+                loadingCard.classList.add('show');
+            } else {
+                loadingCard.classList.remove('show');
+            }
+        }
+
+        // ============================================================================
+        // 🛡️ ERROR HANDLING & CLEANUP
+        // ============================================================================
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && AppState.isRecording) {
+                console.warn('⚠️ Tab hidden while recording');
+                // Optionally pause recording
+            }
+        });
+
+        // Handle before unload
+        window.addEventListener('beforeunload', (event) => {
+            if (AppState.sessionId && !document.getElementById('interviewComplete').classList.contains('show')) {
+                event.preventDefault();
+                event.returnValue = 'You have an ongoing AI interview. Are you sure you want to leave?';
+            }
+        });
+
+        // Global error handler
+        window.addEventListener('error', (event) => {
+            console.error('🚨 Global error:', event.error);
+            showError('An unexpected error occurred. Please refresh the page and try again.');
+        });
+
+        console.log('🚀 HEVHIRE AI Interviewer frontend loaded successfully');
+    </script>
+</body>
+</html>
