@@ -10,11 +10,3 @@ reportlab==4.0.7
 pydantic==2.5.0
 typing-extensions==4.8.0
 asyncio==3.4.3
-json==2.0.9
-uuid==1.30
-datetime==5.3
-logging==0.4.9.6
-tempfile==1.0
-io==0.0.1
-
-os==0.1.4
