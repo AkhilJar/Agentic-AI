@@ -1,23 +1,26 @@
 #!/bin/bash
-set -e  # exit immediately if a command fails
+set -e
 
-# Setup Cargo and Rustup environment directories
 export CARGO_HOME=$HOME/.cargo
 export RUSTUP_HOME=$HOME/.rustup
 export PATH=$CARGO_HOME/bin:$PATH
 
-# Install Rust toolchain if missing
 if ! command -v cargo >/dev/null; then
   echo "Installing Rust toolchain..."
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+  # Source rust environment after installation
+  source $HOME/.cargo/env
+else
+  # If Rust is already installed, source env anyway (if file exists)
+  if [ -f "$HOME/.cargo/env" ]; then
+    source $HOME/.cargo/env
+  fi
 fi
 
-# Source Rust environment for this shell session
-source $HOME/.cargo/env
-
-# Set default Rust toolchain to stable
+# Set default Rust version (stable)
 rustup default stable
 
-# Go to your backend directory and install Python requirements
+# Now install Python dependencies
 cd chatgpt-interviewer-bot-backend
 pip install -r requirements.txt
