@@ -8,7 +8,7 @@ log() {
 log "🚀 Starting deployment process..."
 
 # ---------------------------
-# Step 1: Upgrade Python build tools first
+# Step 1: Upgrade Python build tools
 # ---------------------------
 log "📦 Upgrading pip, setuptools, and wheel..."
 python3 -m pip install --upgrade pip setuptools wheel
@@ -18,20 +18,22 @@ python3 -m pip install --upgrade pip setuptools wheel
 # ---------------------------
 if grep -q "pydantic" requirements.txt || grep -q "maturin" requirements.txt; then
     log "🦀 Rust might be required for some dependencies. Checking..."
+    export CARGO_HOME=$HOME/.cargo
+    export RUSTUP_HOME=$HOME/.rustup
+    export PATH=$CARGO_HOME/bin:$PATH
+
     if ! command -v cargo >/dev/null; then
-        log "Rust not found. Installing Rust toolchain..."
-        export CARGO_HOME=$HOME/.cargo
-        export RUSTUP_HOME=$HOME/.rustup
-        export PATH=$CARGO_HOME/bin:$PATH
+        log "📥 Installing Rust toolchain..."
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         source $HOME/.cargo/env
     else
         log "✅ Rust already installed."
         if [ -f "$HOME/.cargo/env" ]; then
-            log "Loading Rust environment..."
+            log "🔄 Loading Rust environment..."
             source $HOME/.cargo/env
         fi
     fi
+
     log "📌 Setting Rust to stable version..."
     rustup default stable
 else
@@ -39,7 +41,7 @@ else
 fi
 
 # ---------------------------
-# Step 3: Move to project directory
+# Step 3: Change to project directory
 # ---------------------------
 if [ -d "chatgpt-interviewer-bot-backend" ]; then
     log "📂 Changing directory to project folder..."
@@ -54,6 +56,7 @@ fi
 # ---------------------------
 if [ -f requirements.txt ]; then
     log "📜 Installing dependencies from requirements.txt..."
+    pip install --upgrade pip setuptools wheel
     pip install -r requirements.txt
 else
     log "❌ ERROR: requirements.txt not found in project folder!"
