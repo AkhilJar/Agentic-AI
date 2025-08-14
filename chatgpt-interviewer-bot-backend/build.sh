@@ -1,78 +1,77 @@
 #!/bin/bash
-set -e  # Exit immediately on error
+set -e  # Exit on any error
 
 log() {
     echo "[$(date '+%H:%M:%S')] $1"
 }
 
-log "🚀 Starting deployment process..."
+log "🚀 Starting build script..."
 
 # ---------------------------
-# Step 1: Upgrade Python build tools
+# 1. Setup Rust environment
 # ---------------------------
-log "📦 Upgrading pip, setuptools, and wheel..."
-python3 -m pip install --upgrade pip setuptools wheel
+log "Setting Rust environment variables..."
+export CARGO_HOME=$HOME/.cargo
+export RUSTUP_HOME=$HOME/.rustup
+export PATH=$CARGO_HOME/bin:$PATH
 
 # ---------------------------
-# Step 2: Check if Rust is needed
+# 2. Install Rust if missing
 # ---------------------------
-if grep -q "pydantic" requirements.txt || grep -q "maturin" requirements.txt; then
-    log "🦀 Rust might be required for some dependencies. Checking..."
-    export CARGO_HOME=$HOME/.cargo
-    export RUSTUP_HOME=$HOME/.rustup
-    export PATH=$CARGO_HOME/bin:$PATH
-
-    if ! command -v cargo >/dev/null; then
-        log "📥 Installing Rust toolchain..."
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-        source $HOME/.cargo/env
-    else
-        log "✅ Rust already installed."
-        if [ -f "$HOME/.cargo/env" ]; then
-            log "🔄 Loading Rust environment..."
-            source $HOME/.cargo/env
-        fi
-    fi
-
-    log "📌 Setting Rust to stable version..."
-    rustup default stable
+if ! command -v cargo >/dev/null; then
+    log "Rust not found. Installing Rust toolchain..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source $HOME/.cargo/env
 else
-    log "✅ No Rust-heavy packages detected. Skipping Rust installation."
+    log "✅ Rust already installed."
+    if [ -f "$HOME/.cargo/env" ]; then
+        log "Loading Rust environment..."
+        source $HOME/.cargo/env
+    fi
 fi
 
 # ---------------------------
-# Step 3: Change to project directory
+# 3. Ensure stable Rust
 # ---------------------------
-if [ -d "chatgpt-interviewer-bot-backend" ]; then
-    log "📂 Changing directory to project folder..."
-    cd chatgpt-interviewer-bot-backend
+log "Setting Rust to stable version..."
+rustup default stable
+
+# ---------------------------
+# 4. Upgrade Python build tools
+# ---------------------------
+log "Upgrading pip, setuptools, wheel, and maturin..."
+pip install --upgrade pip setuptools wheel maturin
+
+# ---------------------------
+# 5. Move to project directory
+# ---------------------------
+PROJECT_DIR="chatgpt-interviewer-bot-backend"
+if [ -d "$PROJECT_DIR" ]; then
+    log "Changing directory to $PROJECT_DIR..."
+    cd "$PROJECT_DIR"
 else
-    log "❌ ERROR: Project folder 'chatgpt-interviewer-bot-backend' not found!"
+    log "❌ ERROR: Project folder '$PROJECT_DIR' not found!"
     exit 1
 fi
 
 # ---------------------------
-# Step 4: Install Python dependencies
+# 6. Install Python dependencies
 # ---------------------------
 if [ -f requirements.txt ]; then
-    log "📜 Installing dependencies from requirements.txt..."
-    pip install --upgrade pip setuptools wheel
+    log "Installing dependencies from requirements.txt..."
     pip install -r requirements.txt
 else
-    log "❌ ERROR: requirements.txt not found in project folder!"
+    log "❌ ERROR: requirements.txt not found!"
     exit 1
 fi
 
 # ---------------------------
-# Step 5: Verify key packages
+# 7. Verify critical package
 # ---------------------------
-log "🔍 Verifying installed packages..."
-python3 - <<'EOF'
-try:
-    import pydantic_core
-    print(f"✅ pydantic-core version: {pydantic_core.__version__}")
-except ImportError:
-    print("⚠️ WARNING: pydantic-core not installed (may not be needed).")
-EOF
+log "Verifying pydantic-core installation..."
+python -c "import pydantic_core; print('✅ pydantic-core version:', pydantic_core.__version__)" || {
+    log "❌ ERROR: pydantic-core failed to import!"
+    exit 1
+}
 
-log "🎉 Deployment completed successfully."
+log "🎉 Build script completed successfully!"
