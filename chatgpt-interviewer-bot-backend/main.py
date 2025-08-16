@@ -1,5 +1,5 @@
-from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks, Request, Form, Depends
-from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
+from fastapi import FastAPI, UploadFile, HTTPException, BackgroundTasks, Request, Form, Depends, Cookie
+from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from dotenv import load_dotenv
@@ -7,14 +7,17 @@ import asyncio
 import uvicorn
 import base64
 import secrets
+import hashlib
+import json
+from datetime import datetime, timedelta
+import sqlite3
+import os
+from pathlib import Path
 
 from openai import OpenAI
-import os
-import json
 import requests
 from tempfile import NamedTemporaryFile
 import uuid
-from datetime import datetime, timedelta
 import logging
 from typing import Dict, List, Optional
 from pydantic import BaseModel
@@ -41,14 +44,238 @@ AZURE_COMMUNICATION_CONNECTION_STRING = os.getenv("AZURE_COMMUNICATION_CONNECTIO
 RECEIVER_EMAIL = "divyesh11092003@gmail.com"
 SENDER_EMAIL = "DoNotReply@5f2fdd04-4185-4ba9-a0b4-8e7b24efae12.azurecomm.net"
 
-# Admin credentials (in production, use proper auth)
+# Admin credentials
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "eazyai2025"
+SECRET_KEY = "eazyai_super_secret_key_2025"
 
 # Initialize clients
 client = OpenAI(api_key=OPEN_AI_KEY, organization=OPEN_AI_ORG)
 blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
 email_client = EmailClient.from_connection_string(AZURE_COMMUNICATION_CONNECTION_STRING)
+
+# Create database directory
+DB_DIR = Path("data")
+DB_DIR.mkdir(exist_ok=True)
+DB_PATH = DB_DIR / "eazyai_interviews.db"
+
+# Initialize SQLite Database
+def init_database():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Interviews table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS interviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT UNIQUE NOT NULL,
+            candidate_name TEXT NOT NULL,
+            position TEXT NOT NULL,
+            experience_level TEXT NOT NULL,
+            start_time DATETIME NOT NULL,
+            end_time DATETIME,
+            status TEXT DEFAULT 'in_progress',
+            current_question INTEGER DEFAULT 0,
+            total_questions INTEGER DEFAULT 10,
+            recommendation TEXT DEFAULT 'pending',
+            email_sent BOOLEAN DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Scores table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            technical_skills INTEGER DEFAULT 0,
+            communication INTEGER DEFAULT 0,
+            problem_solving INTEGER DEFAULT 0,
+            leadership INTEGER DEFAULT 0,
+            adaptability INTEGER DEFAULT 0,
+            creativity INTEGER DEFAULT 0,
+            teamwork INTEGER DEFAULT 0,
+            overall INTEGER DEFAULT 0,
+            FOREIGN KEY (session_id) REFERENCES interviews (session_id)
+        )
+    ''')
+    
+    # Messages table for transcript storage
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES interviews (session_id)
+        )
+    ''')
+    
+    # Admin sessions table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS admin_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_token TEXT UNIQUE NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME NOT NULL,
+            is_active BOOLEAN DEFAULT 1
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+# Database helper functions
+def get_db_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def save_interview_to_db(session):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Insert or update interview
+    cursor.execute('''
+        INSERT OR REPLACE INTO interviews 
+        (session_id, candidate_name, position, experience_level, start_time, end_time, 
+         status, current_question, total_questions, recommendation, email_sent, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ''', (
+        session.session_id, session.candidate_name, session.position, 
+        session.experience_level, session.start_time, session.end_time,
+        session.status, session.current_question, session.total_questions,
+        session.recommendation, session.email_sent
+    ))
+    
+    # Insert or update scores
+    scores = session.scores
+    cursor.execute('''
+        INSERT OR REPLACE INTO scores 
+        (session_id, technical_skills, communication, problem_solving, leadership, 
+         adaptability, creativity, teamwork, overall)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        session.session_id, scores.get('technical_skills', 0), scores.get('communication', 0),
+        scores.get('problem_solving', 0), scores.get('leadership', 0), 
+        scores.get('adaptability', 0), scores.get('creativity', 0),
+        scores.get('teamwork', 0), scores.get('overall', 0)
+    ))
+    
+    conn.commit()
+    conn.close()
+
+def save_message_to_db(session_id, role, content):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO messages (session_id, role, content)
+        VALUES (?, ?, ?)
+    ''', (session_id, role, content))
+    conn.commit()
+    conn.close()
+
+def get_all_interviews_from_db():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get interviews with scores
+    cursor.execute('''
+        SELECT i.*, s.technical_skills, s.communication, s.problem_solving, 
+               s.leadership, s.adaptability, s.creativity, s.teamwork, s.overall
+        FROM interviews i
+        LEFT JOIN scores s ON i.session_id = s.session_id
+        ORDER BY i.start_time DESC
+    ''')
+    
+    interviews = []
+    for row in cursor.fetchall():
+        interview = dict(row)
+        # Add scores dictionary
+        interview['scores'] = {
+            'technical_skills': interview.get('technical_skills', 0),
+            'communication': interview.get('communication', 0),
+            'problem_solving': interview.get('problem_solving', 0),
+            'leadership': interview.get('leadership', 0),
+            'adaptability': interview.get('adaptability', 0),
+            'creativity': interview.get('creativity', 0),
+            'teamwork': interview.get('teamwork', 0),
+            'overall': interview.get('overall', 0)
+        }
+        interviews.append(interview)
+    
+    conn.close()
+    return interviews
+
+def get_interview_messages(session_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT role, content, timestamp FROM messages 
+        WHERE session_id = ? ORDER BY timestamp ASC
+    ''', (session_id,))
+    messages = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return messages
+
+def update_interview_status_in_db(session_id, status, notes=None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE interviews 
+        SET status = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE session_id = ?
+    ''', (status, session_id))
+    conn.commit()
+    conn.close()
+
+# Admin authentication functions
+def generate_session_token():
+    return secrets.token_urlsafe(32)
+
+def create_admin_session():
+    token = generate_session_token()
+    expires_at = datetime.now() + timedelta(hours=24)  # 24 hour session
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO admin_sessions (session_token, expires_at)
+        VALUES (?, ?)
+    ''', (token, expires_at))
+    conn.commit()
+    conn.close()
+    
+    return token
+
+def validate_admin_session(token):
+    if not token:
+        return False
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id FROM admin_sessions 
+        WHERE session_token = ? AND expires_at > CURRENT_TIMESTAMP AND is_active = 1
+    ''', (token,))
+    
+    result = cursor.fetchone()
+    conn.close()
+    
+    return result is not None
+
+def invalidate_admin_session(token):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE admin_sessions 
+        SET is_active = 0 
+        WHERE session_token = ?
+    ''', (token,))
+    conn.commit()
+    conn.close()
 
 # Security
 security = HTTPBasic()
@@ -57,11 +284,14 @@ security = HTTPBasic()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Initialize database
+init_database()
+
 # FastAPI App
 app = FastAPI(
     title="eazyAI Enterprise Interviewer",
-    description="Enterprise-grade AI-powered interviewing platform by eazyAI",
-    version="2.0.0"
+    description="Enterprise-grade AI-powered interviewing platform with persistent dashboard",
+    version="3.0.0"
 )
 
 # CORS middleware
@@ -81,11 +311,11 @@ class InterviewSession(BaseModel):
     experience_level: str
     start_time: datetime
     end_time: Optional[datetime] = None
-    messages: List[Dict]
+    messages: List[Dict] = []
     scores: Dict[str, int] = {}
     total_questions: int = 10
     current_question: int = 0
-    status: str = "in_progress"  # in_progress, completed, hired, reviewed, rejected
+    status: str = "in_progress"
     recommendation: str = "pending"
     email_sent: bool = False
 
@@ -99,36 +329,23 @@ class StatusUpdate(BaseModel):
     status: str
     notes: Optional[str] = ""
 
-# In-memory storage (in production, use proper database)
+# In-memory storage for active sessions only (completed go to DB)
 active_sessions: Dict[str, InterviewSession] = {}
-completed_sessions: Dict[str, InterviewSession] = {}
 
-# Container names (existing containers)
+# Container names
 CONTAINERS = {
     "transcripts": "transcripts",
     "evaluations": "evaluationresults", 
     "reports": "reports"
 }
 
-def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
-    """Verify admin credentials"""
-    is_correct_username = secrets.compare_digest(credentials.username, ADMIN_USERNAME)
-    is_correct_password = secrets.compare_digest(credentials.password, ADMIN_PASSWORD)
-    if not (is_correct_username and is_correct_password):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid admin credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials
-
 @app.on_event("startup")
 async def startup_event():
-    logger.info("🚀 eazyAI Enterprise Interviewer Platform started successfully!")
+    logger.info("🚀 eazyAI Enterprise Platform with Persistent Dashboard started!")
 
 @app.get("/", response_class=HTMLResponse)
 async def get_frontend():
-    """Serve the enterprise frontend with navy blue theme"""
+    """Serve the enterprise frontend"""
     html_content = """
 <!DOCTYPE html>
 <html lang="en">
@@ -292,6 +509,27 @@ async def get_frontend():
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
+            box-shadow: 0 8px 25px rgba(0, 31, 63, 0.3);
+        }
+
+        .admin-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            color: #001f3f;
+            font-weight: 600;
+            box-shadow: 0 5px 15px rgba(0, 31, 63, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .admin-link:hover {
+            background: #001f3f;
+            color: white;
+            transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(0, 31, 63, 0.3);
         }
 
@@ -484,6 +722,8 @@ async def get_frontend():
     </style>
 </head>
 <body>
+    <a href="/admin" class="admin-link">🏢 Admin Dashboard</a>
+    
     <div class="container">
         <div class="brand-header">
             <div class="brand-icon">e</div>
@@ -700,7 +940,7 @@ async def get_frontend():
                     return;
                 }
                 
-                // Add transcript entry (NO SCORES SHOWN TO CANDIDATE)
+                // Add transcript entry
                 const transcriptEntry = document.createElement('div');
                 transcriptEntry.className = 'transcript-entry slide-up';
                 transcriptEntry.innerHTML = `
@@ -819,10 +1059,182 @@ async def get_frontend():
     """
     return HTMLResponse(content=html_content)
 
-# Complete Admin Dashboard
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_admin)):
-    """Complete Admin dashboard with full functionality"""
+# Admin login page
+@app.get("/admin")
+async def admin_page(admin_token: str = Cookie(None)):
+    """Admin dashboard with proper authentication"""
+    if validate_admin_session(admin_token):
+        return get_admin_dashboard()
+    else:
+        return get_admin_login()
+
+def get_admin_login():
+    """Admin login page"""
+    return HTMLResponse(content="""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eazyAI Admin Login</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 50px;
+            border-radius: 25px;
+            box-shadow: 0 25px 50px rgba(0, 31, 63, 0.3);
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
+        }
+        .brand {
+            font-size: 3rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, #001f3f, #003366);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.2rem;
+        }
+        .form-group {
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        input {
+            width: 100%;
+            padding: 16px 20px;
+            border: 2px solid #e0e7ff;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #fafbff;
+        }
+        input:focus {
+            border-color: #001f3f;
+            outline: none;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(0, 31, 63, 0.1);
+        }
+        .btn {
+            background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
+            color: white;
+            padding: 18px 40px;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            box-shadow: 0 8px 25px rgba(0, 31, 63, 0.3);
+        }
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(0, 31, 63, 0.4);
+        }
+        .error {
+            color: #c62828;
+            margin-top: 15px;
+            padding: 10px;
+            background: #ffebee;
+            border-radius: 8px;
+            display: none;
+        }
+        .back-link {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            opacity: 0.8;
+            transition: opacity 0.3s ease;
+        }
+        .back-link:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link">← Back to Interview Platform</a>
+    
+    <div class="login-container">
+        <div class="brand">eazyAI</div>
+        <div class="subtitle">Admin Dashboard Access</div>
+        
+        <form id="loginForm" onsubmit="adminLogin(event)">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" required>
+            </div>
+            
+            <button type="submit" class="btn">🔐 Access Dashboard</button>
+            
+            <div id="errorMessage" class="error"></div>
+        </form>
+    </div>
+
+    <script>
+        async function adminLogin(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('errorMessage');
+            
+            try {
+                const response = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Set cookie and redirect
+                    document.cookie = `admin_token=${data.token}; path=/; max-age=${24*60*60}; secure; samesite=strict`;
+                    window.location.href = '/admin/dashboard';
+                } else {
+                    errorDiv.textContent = 'Invalid credentials. Please try again.';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Login failed. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>
+    """)
+
+def get_admin_dashboard():
+    """Complete functional admin dashboard"""
     return HTMLResponse(content="""
 <!DOCTYPE html>
 <html lang="en">
@@ -839,7 +1251,7 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
             padding: 20px;
         }
         .dashboard {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
@@ -861,9 +1273,13 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
         .stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 40px;
         }
@@ -894,6 +1310,7 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
             border-radius: 15px;
             overflow: hidden;
             box-shadow: 0 5px 15px rgba(0, 31, 63, 0.1);
+            margin-bottom: 30px;
         }
         .section-header {
             background: linear-gradient(135deg, #001f3f, #003366);
@@ -905,8 +1322,32 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
             justify-content: space-between;
             align-items: center;
         }
+        .filters {
+            background: #f8f9fa;
+            padding: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #ddd;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .filter-group label {
+            font-weight: 600;
+            color: #333;
+        }
+        .filter-group select, .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
         .table-container {
-            max-height: 600px;
+            max-height: 700px;
             overflow-y: auto;
         }
         .interview-table {
@@ -925,6 +1366,12 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
             font-weight: 600;
             color: #333;
             border-bottom: 2px solid #dee2e6;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s ease;
+        }
+        .table-header th:hover {
+            background: #e9ecef;
         }
         .interview-row {
             transition: background-color 0.2s ease;
@@ -944,7 +1391,7 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
             font-weight: bold;
             text-align: center;
             display: inline-block;
-            min-width: 80px;
+            min-width: 90px;
         }
         .status-completed { background: #e8f5e8; color: #2e7d32; }
         .status-in-progress { background: #fff3e0; color: #ef6c00; }
@@ -961,6 +1408,8 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
             font-size: 0.9rem;
             transition: all 0.3s ease;
             margin: 2px;
+            text-decoration: none;
+            display: inline-block;
         }
         .btn:hover { 
             transform: translateY(-2px);
@@ -969,6 +1418,7 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
         .btn-success { background: linear-gradient(135deg, #4caf50, #66bb6a); }
         .btn-danger { background: linear-gradient(135deg, #f44336, #ef5350); }
         .btn-warning { background: linear-gradient(135deg, #ff9800, #ffb74d); }
+        .btn-info { background: linear-gradient(135deg, #2196f3, #42a5f5); }
         .refresh-btn {
             background: #4caf50;
             padding: 12px 24px;
@@ -986,12 +1436,14 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
         }
         .modal-content {
             background-color: #fefefe;
-            margin: 5% auto;
+            margin: 3% auto;
             padding: 30px;
             border-radius: 15px;
-            width: 80%;
-            max-width: 600px;
+            width: 90%;
+            max-width: 800px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            max-height: 90vh;
+            overflow-y: auto;
         }
         .close {
             color: #aaa;
@@ -1041,15 +1493,50 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
             padding: 20px;
             color: #666;
         }
+        .transcript-section {
+            margin-top: 30px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .transcript-entry {
+            background: white;
+            margin-bottom: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #001f3f;
+        }
+        .message-role {
+            font-weight: bold;
+            color: #001f3f;
+            margin-bottom: 5px;
+        }
+        .message-content {
+            color: #333;
+            line-height: 1.5;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
     </style>
 </head>
 <body>
     <div class="dashboard">
         <div class="header">
             <div class="brand">🚀 eazyAI Admin Dashboard</div>
-            <div>
+            <div class="header-actions">
                 <button class="btn refresh-btn" onclick="refreshData()">🔄 Refresh Data</button>
-                <button class="btn" onclick="exportData()">📊 Export Data</button>
+                <button class="btn btn-info" onclick="exportData()">📊 Export CSV</button>
+                <button class="btn btn-warning" onclick="downloadReports()">📄 Download Reports</button>
+                <button class="btn btn-danger" onclick="logout()">🚪 Logout</button>
             </div>
         </div>
         
@@ -1070,32 +1557,84 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
                 <div class="stat-number" id="hiredCandidates">0</div>
                 <div class="stat-label">Hired Candidates</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-number" id="avgScore">0</div>
+                <div class="stat-label">Average Score</div>
+            </div>
         </div>
         
         <div class="interviews-section">
             <div class="section-header">
                 <span>📋 Interview Management</span>
-                <span id="lastUpdated">Last updated: Never</span>
+                <span id="lastUpdated">Last updated: Loading...</span>
             </div>
+            
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Status:</label>
+                    <select id="statusFilter" onchange="filterInterviews()">
+                        <option value="">All Statuses</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="hired">Hired</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="reviewed">Under Review</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Position:</label>
+                    <select id="positionFilter" onchange="filterInterviews()">
+                        <option value="">All Positions</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Experience:</label>
+                    <select id="experienceFilter" onchange="filterInterviews()">
+                        <option value="">All Levels</option>
+                        <option value="junior">Junior</option>
+                        <option value="mid">Mid-level</option>
+                        <option value="senior">Senior</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Search:</label>
+                    <input type="text" id="searchFilter" placeholder="Search candidates..." onkeyup="filterInterviews()">
+                </div>
+            </div>
+            
             <div class="table-container">
                 <table class="interview-table">
                     <thead class="table-header">
                         <tr>
-                            <th>Candidate</th>
-                            <th>Position</th>
-                            <th>Date</th>
+                            <th onclick="sortTable('candidate_name')">Candidate ↕️</th>
+                            <th onclick="sortTable('position')">Position ↕️</th>
+                            <th onclick="sortTable('experience_level')">Experience ↕️</th>
+                            <th onclick="sortTable('start_time')">Date ↕️</th>
+                            <th onclick="sortTable('status')">Status ↕️</th>
+                            <th onclick="sortTable('overall')">Score ↕️</th>
                             <th>Duration</th>
-                            <th>Status</th>
-                            <th>Overall Score</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="interviewsTableBody">
                         <tr>
-                            <td colspan="7" class="loading">Loading interview data...</td>
+                            <td colspan="8" class="loading">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                                    <div style="width: 20px; height: 20px; border: 3px solid #f3f3f3; border-radius: 50%; border-top: 3px solid #001f3f; animation: spin 1s linear infinite;"></div>
+                                    Loading interview data...
+                                </div>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
+                
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+                    </svg>
+                    <h3>No interviews found</h3>
+                    <p>Interviews will appear here once candidates start using the platform.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -1104,7 +1643,6 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
     <div id="detailsModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal()">&times;</span>
-            <h2 id="modalTitle">Interview Details</h2>
             <div id="modalContent"></div>
         </div>
     </div>
@@ -1134,44 +1672,42 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
         </div>
     </div>
 
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
     <script>
         let currentSessionId = null;
         let allInterviews = [];
+        let filteredInterviews = [];
+        let sortField = 'start_time';
+        let sortDirection = 'desc';
 
         async function refreshData() {
             try {
-                const response = await fetch('/admin/sessions');
+                const response = await fetch('/admin/interviews-data');
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/admin';
+                        return;
+                    }
+                    throw new Error('Failed to fetch data');
+                }
+                
                 const data = await response.json();
+                allInterviews = data.interviews || [];
                 
                 // Update stats
-                const total = data.active_sessions_count + data.completed_sessions_count;
-                document.getElementById('totalInterviews').textContent = total;
-                document.getElementById('activeInterviews').textContent = data.active_sessions_count;
-                document.getElementById('completedInterviews').textContent = data.completed_sessions_count;
+                updateStats(data.stats);
                 
-                // Calculate hired count
-                const hiredCount = Object.values(data.completed_sessions || {})
-                    .filter(s => s.status === 'hired').length;
-                document.getElementById('hiredCandidates').textContent = hiredCount;
+                // Update filters
+                updateFilters();
                 
-                // Combine active and completed interviews
-                allInterviews = [];
-                
-                // Add active interviews
-                Object.values(data.sessions || {}).forEach(session => {
-                    allInterviews.push({...session, status: 'in_progress'});
-                });
-                
-                // Add completed interviews
-                Object.values(data.completed_sessions || {}).forEach(session => {
-                    allInterviews.push(session);
-                });
-                
-                // Sort by start time (newest first)
-                allInterviews.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
-                
-                // Update table
-                updateInterviewsTable();
+                // Apply current filters and display
+                filterInterviews();
                 
                 // Update last updated time
                 document.getElementById('lastUpdated').textContent = 
@@ -1180,84 +1716,205 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
             } catch (error) {
                 console.error('Error refreshing data:', error);
                 document.getElementById('interviewsTableBody').innerHTML = 
-                    '<tr><td colspan="7" style="color: red; text-align: center;">Error loading data</td></tr>';
+                    '<tr><td colspan="8" style="color: red; text-align: center;">Error loading data. Please try again.</td></tr>';
             }
+        }
+        
+        function updateStats(stats) {
+            document.getElementById('totalInterviews').textContent = stats.total || 0;
+            document.getElementById('activeInterviews').textContent = stats.active || 0;
+            document.getElementById('completedInterviews').textContent = stats.completed || 0;
+            document.getElementById('hiredCandidates').textContent = stats.hired || 0;
+            document.getElementById('avgScore').textContent = stats.avgScore || '0';
+        }
+        
+        function updateFilters() {
+            // Update position filter
+            const positionFilter = document.getElementById('positionFilter');
+            const positions = [...new Set(allInterviews.map(i => i.position))].sort();
+            
+            // Clear existing options except "All Positions"
+            positionFilter.innerHTML = '<option value="">All Positions</option>';
+            positions.forEach(pos => {
+                if (pos) {
+                    const option = document.createElement('option');
+                    option.value = pos;
+                    option.textContent = pos;
+                    positionFilter.appendChild(option);
+                }
+            });
+        }
+        
+        function filterInterviews() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const positionFilter = document.getElementById('positionFilter').value;
+            const experienceFilter = document.getElementById('experienceFilter').value;
+            const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+            
+            filteredInterviews = allInterviews.filter(interview => {
+                const matchesStatus = !statusFilter || interview.status === statusFilter;
+                const matchesPosition = !positionFilter || interview.position === positionFilter;
+                const matchesExperience = !experienceFilter || interview.experience_level === experienceFilter;
+                const matchesSearch = !searchFilter || 
+                    interview.candidate_name.toLowerCase().includes(searchFilter) ||
+                    interview.position.toLowerCase().includes(searchFilter);
+                
+                return matchesStatus && matchesPosition && matchesExperience && matchesSearch;
+            });
+            
+            sortInterviews();
+            updateInterviewsTable();
+        }
+        
+        function sortTable(field) {
+            if (sortField === field) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortField = field;
+                sortDirection = 'asc';
+            }
+            sortInterviews();
+            updateInterviewsTable();
+        }
+        
+        function sortInterviews() {
+            filteredInterviews.sort((a, b) => {
+                let aVal = a[sortField];
+                let bVal = b[sortField];
+                
+                // Handle score sorting
+                if (sortField === 'overall') {
+                    aVal = a.scores?.overall || 0;
+                    bVal = b.scores?.overall || 0;
+                }
+                
+                // Handle date sorting
+                if (sortField === 'start_time') {
+                    aVal = new Date(aVal);
+                    bVal = new Date(bVal);
+                }
+                
+                // Handle string comparison
+                if (typeof aVal === 'string') {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+                
+                if (sortDirection === 'asc') {
+                    return aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+                } else {
+                    return aVal > bVal ? -1 : aVal < bVal ? 1 : 0;
+                }
+            });
         }
         
         function updateInterviewsTable() {
             const tbody = document.getElementById('interviewsTableBody');
+            const emptyState = document.getElementById('emptyState');
             
-            if (allInterviews.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #666;">No interviews found</td></tr>';
+            if (filteredInterviews.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.style.display = 'block';
                 return;
             }
             
-            tbody.innerHTML = allInterviews.map(session => {
-                const date = new Date(session.start_time).toLocaleDateString();
-                const duration = session.end_time ? 
-                    Math.round((new Date(session.end_time) - new Date(session.start_time)) / 60000) : 
-                    'In progress';
-                const statusClass = `status-${session.status.replace('_', '-')}`;
-                const statusText = session.status.replace('_', ' ').toUpperCase();
-                const overallScore = session.scores?.overall || 'N/A';
+            emptyState.style.display = 'none';
+            
+            tbody.innerHTML = filteredInterviews.map(interview => {
+                const date = new Date(interview.start_time).toLocaleDateString();
+                const time = new Date(interview.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                
+                let duration = 'In progress';
+                if (interview.end_time) {
+                    const durationMinutes = Math.round((new Date(interview.end_time) - new Date(interview.start_time)) / 60000);
+                    duration = `${durationMinutes} min`;
+                }
+                
+                const statusClass = `status-${interview.status.replace('_', '-')}`;
+                const statusText = interview.status.replace('_', ' ').toUpperCase();
+                const overallScore = interview.scores?.overall || 'N/A';
                 
                 return `
                     <tr class="interview-row">
-                        <td><strong>${session.candidate_name}</strong></td>
-                        <td>${session.position}</td>
-                        <td>${date}</td>
-                        <td>${duration}${typeof duration === 'number' ? ' min' : ''}</td>
+                        <td><strong>${interview.candidate_name}</strong></td>
+                        <td>${interview.position}</td>
+                        <td>${interview.experience_level.charAt(0).toUpperCase() + interview.experience_level.slice(1)}</td>
+                        <td>${date}<br><small>${time}</small></td>
                         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                         <td><strong>${overallScore}${overallScore !== 'N/A' ? '/10' : ''}</strong></td>
+                        <td>${duration}</td>
                         <td>
-                            <button class="btn" onclick="viewDetails('${session.session_id}')">👁️ View</button>
-                            <button class="btn btn-warning" onclick="updateStatusModal('${session.session_id}')">📝 Update</button>
-                            ${session.status === 'completed' ? 
-                                '<button class="btn btn-success" onclick="markHired(\'' + session.session_id + '\')">✅ Hire</button>' : ''}
+                            <button class="btn btn-info" onclick="viewDetails('${interview.session_id}')" title="View Details">👁️</button>
+                            <button class="btn btn-warning" onclick="updateStatusModal('${interview.session_id}')" title="Update Status">📝</button>
+                            <button class="btn" onclick="downloadTranscript('${interview.session_id}')" title="Download Transcript">📄</button>
+                            ${interview.status === 'completed' ? 
+                                `<button class="btn btn-success" onclick="markHired('${interview.session_id}')" title="Mark as Hired">✅</button>` : ''}
                         </td>
                     </tr>
                 `;
             }).join('');
         }
         
-        function viewDetails(sessionId) {
-            const session = allInterviews.find(s => s.session_id === sessionId);
-            if (!session) return;
+        async function viewDetails(sessionId) {
+            const interview = allInterviews.find(i => i.session_id === sessionId);
+            if (!interview) return;
             
-            const modal = document.getElementById('detailsModal');
-            const title = document.getElementById('modalTitle');
-            const content = document.getElementById('modalContent');
-            
-            title.textContent = `${session.candidate_name} - ${session.position}`;
-            
-            const scores = session.scores || {};
-            const scoreGrid = Object.keys(scores).length > 0 ? `
-                <div class="score-grid">
-                    ${Object.entries(scores).map(([key, value]) => `
-                        <div class="score-item">
-                            <div class="score-value">${value}</div>
-                            <div>${key.replace('_', ' ').toUpperCase()}</div>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : '<p>No scores available</p>';
-            
-            content.innerHTML = `
-                <h3>📊 Performance Scores</h3>
-                ${scoreGrid}
+            try {
+                // Fetch detailed transcript
+                const response = await fetch(`/admin/interview/${sessionId}/details`);
+                const details = await response.json();
                 
-                <h3>📋 Interview Details</h3>
-                <p><strong>Experience Level:</strong> ${session.experience_level}</p>
-                <p><strong>Questions Completed:</strong> ${session.current_question}/${session.total_questions}</p>
-                <p><strong>Start Time:</strong> ${new Date(session.start_time).toLocaleString()}</p>
-                ${session.end_time ? `<p><strong>End Time:</strong> ${new Date(session.end_time).toLocaleString()}</p>` : ''}
-                <p><strong>Status:</strong> ${session.status.replace('_', ' ').toUpperCase()}</p>
+                const modal = document.getElementById('detailsModal');
+                const content = document.getElementById('modalContent');
                 
-                <h3>🎯 Recommendation</h3>
-                <p><strong>${session.recommendation || 'Pending'}</strong></p>
-            `;
-            
-            modal.style.display = 'block';
+                const scores = interview.scores || {};
+                const scoreGrid = Object.keys(scores).length > 0 ? `
+                    <div class="score-grid">
+                        ${Object.entries(scores).map(([key, value]) => `
+                            <div class="score-item">
+                                <div class="score-value">${value}</div>
+                                <div>${key.replace('_', ' ').toUpperCase()}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : '<p>No scores available</p>';
+                
+                const transcript = details.messages ? `
+                    <div class="transcript-section">
+                        <h3>📝 Full Transcript</h3>
+                        ${details.messages.map(msg => `
+                            <div class="transcript-entry">
+                                <div class="message-role">${msg.role === 'user' ? '🎤 Candidate' : '🤖 AI Interviewer'}:</div>
+                                <div class="message-content">${msg.content}</div>
+                                <small style="color: #666; font-size: 0.8rem;">${new Date(msg.timestamp).toLocaleString()}</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : '<p>No transcript available</p>';
+                
+                content.innerHTML = `
+                    <h2>${interview.candidate_name} - ${interview.position}</h2>
+                    
+                    <h3>📊 Performance Scores</h3>
+                    ${scoreGrid}
+                    
+                    <h3>📋 Interview Details</h3>
+                    <p><strong>Experience Level:</strong> ${interview.experience_level}</p>
+                    <p><strong>Questions Completed:</strong> ${interview.current_question}/${interview.total_questions}</p>
+                    <p><strong>Start Time:</strong> ${new Date(interview.start_time).toLocaleString()}</p>
+                    ${interview.end_time ? `<p><strong>End Time:</strong> ${new Date(interview.end_time).toLocaleString()}</p>` : ''}
+                    <p><strong>Status:</strong> ${interview.status.replace('_', ' ').toUpperCase()}</p>
+                    <p><strong>Recommendation:</strong> ${interview.recommendation || 'Pending'}</p>
+                    
+                    ${transcript}
+                `;
+                
+                modal.style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error fetching interview details:', error);
+                alert('Error loading interview details');
+            }
         }
         
         function updateStatusModal(sessionId) {
@@ -1322,6 +1979,28 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
             }
         }
         
+        async function downloadTranscript(sessionId) {
+            try {
+                const response = await fetch(`/admin/interview/${sessionId}/transcript`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `transcript_${sessionId}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    alert('Error downloading transcript');
+                }
+            } catch (error) {
+                console.error('Error downloading transcript:', error);
+                alert('Error downloading transcript');
+            }
+        }
+        
         function closeModal() {
             document.getElementById('detailsModal').style.display = 'none';
         }
@@ -1333,10 +2012,15 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
         }
         
         function exportData() {
+            if (filteredInterviews.length === 0) {
+                alert('No data to export');
+                return;
+            }
+            
             const csvContent = "data:text/csv;charset=utf-8," + 
-                "Candidate Name,Position,Experience Level,Status,Overall Score,Start Time,Questions Completed\\n" +
-                allInterviews.map(s => 
-                    `"${s.candidate_name}","${s.position}","${s.experience_level}","${s.status}",${s.scores?.overall || 'N/A'},"${s.start_time}",${s.current_question}`
+                "Candidate Name,Position,Experience Level,Status,Overall Score,Start Time,End Time,Questions Completed,Recommendation\\n" +
+                filteredInterviews.map(i => 
+                    `"${i.candidate_name}","${i.position}","${i.experience_level}","${i.status}",${i.scores?.overall || 'N/A'},"${i.start_time}","${i.end_time || 'N/A'}",${i.current_question},"${i.recommendation}"`
                 ).join("\\n");
             
             const encodedUri = encodeURI(csvContent);
@@ -1346,6 +2030,39 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+        }
+        
+        async function downloadReports() {
+            try {
+                const response = await fetch('/admin/download-reports');
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `eazyAI_reports_${new Date().toISOString().split('T')[0]}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    alert('Error downloading reports');
+                }
+            } catch (error) {
+                console.error('Error downloading reports:', error);
+                alert('Error downloading reports');
+            }
+        }
+        
+        async function logout() {
+            try {
+                await fetch('/admin/logout', { method: 'POST' });
+                document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+                window.location.href = '/admin';
+            } catch (error) {
+                console.error('Error during logout:', error);
+                window.location.href = '/admin';
+            }
         }
         
         // Close modals when clicking outside
@@ -1363,14 +2080,197 @@ async def admin_dashboard(credentials: HTTPBasicCredentials = Depends(verify_adm
         // Initial load and auto-refresh
         refreshData();
         setInterval(refreshData, 30000); // Refresh every 30 seconds
+        
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+                closeStatusModal();
+            }
+        });
     </script>
 </body>
 </html>
     """)
 
+# Admin authentication endpoints
+@app.post("/admin/login")
+async def admin_login(request: Request):
+    """Admin login endpoint"""
+    try:
+        data = await request.json()
+        username = data.get('username')
+        password = data.get('password')
+        
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            token = create_admin_session()
+            return JSONResponse({
+                "success": True,
+                "token": token,
+                "message": "Login successful"
+            })
+        else:
+            return JSONResponse({
+                "success": False,
+                "message": "Invalid credentials"
+            }, status_code=401)
+            
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        return JSONResponse({
+            "success": False,
+            "message": "Login failed"
+        }, status_code=500)
+
+@app.get("/admin/dashboard")
+async def admin_dashboard_redirect(admin_token: str = Cookie(None)):
+    """Redirect to dashboard if authenticated"""
+    if validate_admin_session(admin_token):
+        return get_admin_dashboard()
+    else:
+        return RedirectResponse(url="/admin")
+
+@app.post("/admin/logout")
+async def admin_logout(admin_token: str = Cookie(None)):
+    """Admin logout endpoint"""
+    if admin_token:
+        invalidate_admin_session(admin_token)
+    
+    response = JSONResponse({"message": "Logged out successfully"})
+    response.delete_cookie("admin_token")
+    return response
+
+# Admin data endpoints
+@app.get("/admin/interviews-data")
+async def get_interviews_data(admin_token: str = Cookie(None)):
+    """Get all interviews data for admin dashboard"""
+    if not validate_admin_session(admin_token):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        interviews = get_all_interviews_from_db()
+        
+        # Calculate stats
+        total = len(interviews)
+        active = len([i for i in interviews if i['status'] == 'in_progress'])
+        completed = len([i for i in interviews if i['status'] != 'in_progress'])
+        hired = len([i for i in interviews if i['status'] == 'hired'])
+        
+        # Calculate average score
+        scores = [i['scores']['overall'] for i in interviews if i['scores']['overall'] > 0]
+        avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+        
+        return {
+            "interviews": interviews,
+            "stats": {
+                "total": total,
+                "active": active,
+                "completed": completed,
+                "hired": hired,
+                "avgScore": avg_score
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching interviews data: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch data")
+
+@app.get("/admin/interview/{session_id}/details")
+async def get_interview_details(session_id: str, admin_token: str = Cookie(None)):
+    """Get detailed interview information including transcript"""
+    if not validate_admin_session(admin_token):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        messages = get_interview_messages(session_id)
+        return {"messages": messages}
+    except Exception as e:
+        logger.error(f"Error fetching interview details: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch details")
+
+@app.get("/admin/interview/{session_id}/transcript")
+async def download_interview_transcript(session_id: str, admin_token: str = Cookie(None)):
+    """Download interview transcript as text file"""
+    if not validate_admin_session(admin_token):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        messages = get_interview_messages(session_id)
+        interviews = get_all_interviews_from_db()
+        interview = next((i for i in interviews if i['session_id'] == session_id), None)
+        
+        if not interview:
+            raise HTTPException(status_code=404, detail="Interview not found")
+        
+        # Generate transcript text
+        transcript_text = f"""
+eazyAI Interview Transcript
+==========================
+
+Candidate: {interview['candidate_name']}
+Position: {interview['position']}
+Experience Level: {interview['experience_level']}
+Date: {interview['start_time']}
+Status: {interview['status']}
+Overall Score: {interview['scores']['overall']}/10
+
+Transcript:
+-----------
+
+"""
+        
+        for msg in messages:
+            role = "🎤 Candidate" if msg['role'] == 'user' else "🤖 AI Interviewer"
+            timestamp = msg['timestamp']
+            content = msg['content']
+            transcript_text += f"{role} [{timestamp}]:\n{content}\n\n"
+        
+        # Create response
+        response = StreamingResponse(
+            io.StringIO(transcript_text),
+            media_type="text/plain",
+            headers={"Content-Disposition": f"attachment; filename=transcript_{session_id}.txt"}
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error downloading transcript: {e}")
+        raise HTTPException(status_code=500, detail="Failed to download transcript")
+
+@app.post("/admin/update-status")
+async def update_interview_status(
+    status_update: StatusUpdate, 
+    admin_token: str = Cookie(None)
+):
+    """Update interview status from admin dashboard"""
+    if not validate_admin_session(admin_token):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    try:
+        session_id = status_update.session_id
+        new_status = status_update.status
+        notes = status_update.notes
+        
+        # Update in database
+        update_interview_status_in_db(session_id, new_status, notes)
+        
+        # Also update in active sessions if exists
+        if session_id in active_sessions:
+            active_sessions[session_id].status = new_status
+        
+        logger.info(f"✅ Status updated for session {session_id}: {new_status}")
+        
+        return {"message": "Status updated successfully", "session_id": session_id}
+        
+    except Exception as e:
+        logger.error(f"❌ Error updating status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Interview endpoints (same as before but with database persistence)
 @app.post("/start-interview")
 async def start_interview(request: InterviewRequest):
-    """Initialize a new interview session"""
+    """Initialize a new interview session with database persistence"""
     try:
         session_id = str(uuid.uuid4())
         
@@ -1401,6 +2301,12 @@ async def start_interview(request: InterviewRequest):
         # Generate audio
         audio_data = text_to_speech(first_question)
         
+        # Save to database
+        save_interview_to_db(session)
+        save_message_to_db(session_id, "system", system_prompt)
+        save_message_to_db(session_id, "assistant", first_question)
+        
+        # Keep in active sessions
         active_sessions[session_id] = session
         
         logger.info(f"✅ Interview started for {request.candidate_name} - Session: {session_id}")
@@ -1417,7 +2323,7 @@ async def start_interview(request: InterviewRequest):
 
 @app.post("/process-audio")
 async def process_audio(request: Request):
-    """Process candidate's audio response - SCORES HIDDEN FROM CANDIDATE"""
+    """Process candidate's audio response with database persistence"""
     try:
         form = await request.form()
         file = form.get("file")
@@ -1439,10 +2345,12 @@ async def process_audio(request: Request):
             transcript = "I didn't catch that clearly. Could you please repeat your answer?"
         
         session.messages.append({"role": "user", "content": transcript})
+        save_message_to_db(session_id, "user", transcript)
         
         # Generate AI response WITHOUT revealing scores
         ai_response = await generate_ai_response_without_scores(session)
         session.messages.append({"role": "assistant", "content": ai_response})
+        save_message_to_db(session_id, "assistant", ai_response)
         
         # Generate audio response
         audio_data = text_to_speech(ai_response)
@@ -1455,6 +2363,9 @@ async def process_audio(request: Request):
         # Update scores internally (hidden from candidate)
         await update_session_scores(session)
         
+        # Update database
+        save_interview_to_db(session)
+        
         return {
             "success": True,
             "transcript": transcript,
@@ -1463,7 +2374,6 @@ async def process_audio(request: Request):
             "question_number": session.current_question,
             "total_questions": session.total_questions,
             "interview_complete": session.current_question >= session.total_questions
-            # NOTE: NO SCORES RETURNED TO CANDIDATE
         }
         
     except Exception as e:
@@ -1479,7 +2389,7 @@ async def process_audio(request: Request):
 
 @app.post("/end-interview/{session_id}")
 async def end_interview(session_id: str, background_tasks: BackgroundTasks):
-    """End interview and generate report"""
+    """End interview and generate report with database persistence"""
     try:
         if session_id not in active_sessions:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -1492,8 +2402,10 @@ async def end_interview(session_id: str, background_tasks: BackgroundTasks):
         final_evaluation = await generate_final_evaluation(session)
         session.recommendation = final_evaluation.get("recommendation", "Review Required")
         
-        # Move to completed sessions
-        completed_sessions[session_id] = session
+        # Save final state to database
+        save_interview_to_db(session)
+        
+        # Remove from active sessions
         del active_sessions[session_id]
         
         # Generate and send report to recruiter
@@ -1510,75 +2422,7 @@ async def end_interview(session_id: str, background_tasks: BackgroundTasks):
         logger.error(f"❌ Error ending interview: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/admin/sessions")
-async def get_admin_sessions(credentials: HTTPBasicCredentials = Depends(verify_admin)):
-    """Admin endpoint with completed sessions"""
-    active_summary = {}
-    for session_id, session in active_sessions.items():
-        active_summary[session_id] = {
-            "session_id": session_id,
-            "candidate_name": session.candidate_name,
-            "position": session.position,
-            "experience_level": session.experience_level,
-            "start_time": session.start_time.isoformat(),
-            "current_question": session.current_question,
-            "total_questions": session.total_questions,
-            "scores": session.scores,
-            "status": session.status
-        }
-    
-    completed_summary = {}
-    for session_id, session in completed_sessions.items():
-        completed_summary[session_id] = {
-            "session_id": session_id,
-            "candidate_name": session.candidate_name,
-            "position": session.position,
-            "experience_level": session.experience_level,
-            "start_time": session.start_time.isoformat(),
-            "end_time": session.end_time.isoformat() if session.end_time else None,
-            "current_question": session.current_question,
-            "scores": session.scores,
-            "status": session.status,
-            "recommendation": session.recommendation,
-            "email_sent": session.email_sent
-        }
-    
-    return {
-        "platform": "eazyAI Enterprise",
-        "active_sessions_count": len(active_sessions),
-        "completed_sessions_count": len(completed_sessions),
-        "sessions": active_summary,
-        "completed_sessions": completed_summary
-    }
-
-@app.post("/admin/update-status")
-async def update_interview_status(
-    status_update: StatusUpdate, 
-    credentials: HTTPBasicCredentials = Depends(verify_admin)
-):
-    """Update interview status from admin dashboard"""
-    try:
-        session_id = status_update.session_id
-        new_status = status_update.status
-        notes = status_update.notes
-        
-        # Find session in completed sessions
-        if session_id in completed_sessions:
-            session = completed_sessions[session_id]
-            session.status = new_status
-            
-            logger.info(f"✅ Status updated for {session.candidate_name}: {new_status}")
-            
-            return {"message": "Status updated successfully", "session_id": session_id}
-        else:
-            raise HTTPException(status_code=404, detail="Session not found")
-            
-    except Exception as e:
-        logger.error(f"❌ Error updating status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# Core Functions
-
+# Helper functions (same as before but some modifications for database)
 def generate_system_prompt(position: str, experience_level: str) -> str:
     """Generate system prompt for AI interviewer"""
     return f"""You are an expert AI interviewer for eazyAI conducting a professional interview for a {position} position at {experience_level} level.
@@ -1688,12 +2532,12 @@ async def update_session_scores(session: InterviewSession):
         logger.error(f"❌ Error updating scores: {e}")
 
 def text_to_speech(text: str) -> str:
-    """Convert text to speech using ElevenLabs with updated voice"""
+    """Convert text to speech using ElevenLabs"""
     if not ELEVENLABS_KEY or not text.strip():
         return ""
     
     try:
-        voice_id = "oyxaSt75JW8l04MCJaSo"  # Your specified voice ID
+        voice_id = "oyxaSt75JW8l04MCJaSo"
         url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
         
         headers = {
@@ -1850,8 +2694,14 @@ async def generate_and_send_report(session: InterviewSession, evaluation: Dict):
         # Send email to recruiter
         await send_email_report(session, evaluation, pdf_buffer.getvalue())
         
-        # Mark email as sent
-        session.email_sent = True
+        # Mark email as sent in database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE interviews SET email_sent = 1 WHERE session_id = ?
+        ''', (session.session_id,))
+        conn.commit()
+        conn.close()
         
         logger.info(f"✅ Report sent for {session.candidate_name}")
         
@@ -1956,7 +2806,7 @@ def generate_pdf_report(evaluation: Dict) -> io.BytesIO:
     story.append(Spacer(1, 30))
     story.append(Paragraph("Generated by eazyAI Enterprise Platform", styles['Normal']))
     story.append(Paragraph(f"Report generated: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal']))
-    story.append(Paragraph("Access admin dashboard: /admin", styles['Normal']))
+    story.append(Paragraph("Access admin dashboard for detailed management", styles['Normal']))
     
     doc.build(story)
     buffer.seek(0)
@@ -1972,7 +2822,7 @@ def get_performance_level(score: int) -> str:
     else: return "Poor"
 
 async def send_email_report(session: InterviewSession, evaluation: Dict, pdf_content: bytes):
-    """Send email report to recruiter using exact Azure configuration"""
+    """Send email report to recruiter using Azure Communication Services"""
     try:
         html_content = f"""
         <!DOCTYPE html>
@@ -2123,23 +2973,22 @@ async def send_email_report(session: InterviewSession, evaluation: Dict, pdf_con
                     
                     <div class="actions">
                         <h3>⚡ Next Steps</h3>
-                        <p style="margin-bottom: 20px;">Access your admin dashboard for detailed management:</p>
-                        <a href="http://localhost:8000/admin" class="btn">🏢 Admin Dashboard</a>
-                        <a href="mailto:support@eazyai.com" class="btn">💬 Support</a>
+                        <p style="margin-bottom: 20px;">Access your admin dashboard for detailed management and full transcript access.</p>
+                        <p><strong>Dashboard URL:</strong> Your platform admin dashboard</p>
                     </div>
                 </div>
                 
                 <div class="footer">
                     <p><strong>Generated by eazyAI Enterprise Platform</strong></p>
                     <p>🚀 Revolutionizing recruitment with AI-powered interviews</p>
-                    <p>© 2025 eazyAI Enterprise Solutions | <a href="mailto:enterprise@eazyai.com">enterprise@eazyai.com</a></p>
+                    <p>© 2025 eazyAI Enterprise Solutions</p>
                 </div>
             </div>
         </body>
         </html>
         """
         
-        # Use your exact Azure email configuration
+        # Send email using Azure Communication Services
         message = {
             "senderAddress": SENDER_EMAIL,
             "recipients": {
@@ -2158,7 +3007,7 @@ async def send_email_report(session: InterviewSession, evaluation: Dict, pdf_con
             ]
         }
         
-        # Send using your exact method
+        # Send email
         poller = email_client.begin_send(message)
         result = poller.result()
         
@@ -2172,20 +3021,44 @@ async def send_email_report(session: InterviewSession, evaluation: Dict, pdf_con
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "version": "2.0.0",
-        "active_sessions": len(active_sessions),
-        "completed_sessions": len(completed_sessions),
-        "platform": "eazyAI Enterprise"
-    }
+    try:
+        # Check database connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM interviews")
+        total_interviews = cursor.fetchone()[0]
+        conn.close()
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "version": "3.0.0",
+            "active_sessions": len(active_sessions),
+            "total_interviews_in_db": total_interviews,
+            "platform": "eazyAI Enterprise with Persistent Dashboard",
+            "database": "SQLite - Connected",
+            "features": [
+                "AI Interviewing",
+                "Persistent Dashboard", 
+                "Authentication",
+                "Live Data Updates",
+                "Export/Import",
+                "Transcript Management",
+                "Email Reporting"
+            ]
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8080,
         reload=False,
         access_log=True,
         log_level="info"
